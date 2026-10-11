@@ -1,0 +1,22 @@
+# Render Blueprint: the landing page in ./site, served from Render's CDN.
+services:
+  - type: web
+    runtime: static
+    name: hubble-site
+    buildCommand: echo "Static site, nothing to build"
+    staticPublishPath: ./site
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - site/**
+        - render.yaml
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*.png
+        name: Cache-Control
+        value: public, max-age=86400

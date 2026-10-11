@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hubble — the disk space telescope</title>
+  <meta name="description" content="Hubble is a free macOS app that finds what fills your disk, shows what grew since your last scan, and clears out build folders like target and node_modules.">
+  <meta property="og:title" content="Hubble, the disk space telescope">
+  <meta property="og:description" content="Find what fills your Mac, see what grew since last time, and reclaim space in a click.">
+  <meta property="og:image" content="icon.png">
+  <meta name="theme-color" content="#0b0a1f">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <style>
+    :root {
+      --bg: #07061a;
+      --bg-2: #0e0c2b;
+      --card: rgba(255, 255, 255, 0.045);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --text: #f2f0ff;
+      --muted: #a9a5c9;
+      --faint: #6f6a96;
+      --violet: #8b6cff;
+      --pink: #f2679e;
+      --amber: #ffc773;
+      --sky: #9fd8ff;
+      --green: #4fd1a1;
+      --gradient: linear-gradient(120deg, #6c5cff 0%, #b057f2 50%, #f2679e 100%);
+      --radius: 18px;
+      --max: 1120px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+    img { display: block; max-width: 100%; }
+
+    /* Sky */
+    .sky {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(1200px 700px at 75% -10%, rgba(139, 108, 255, 0.28), transparent 60%),
+        radial-gradient(900px 600px at 0% 30%, rgba(242, 103, 158, 0.13), transparent 60%),
+        radial-gradient(800px 800px at 50% 120%, rgba(108, 92, 255, 0.18), transparent 60%),
+        var(--bg);
+    }
+    .stars, .stars::after {
+      position: absolute; inset: -50%;
+      background-image:
+        radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+        radial-gradient(1px 1px at 120px 80px, rgba(255,255,255,.8), transparent),
+        radial-gradient(1.5px 1.5px at 200px 160px, #fff, transparent),
+        radial-gradient(1px 1px at 300px 40px, rgba(255,255,255,.6), transparent),
+        radial-gradient(1px 1px at 380px 220px, #fff, transparent),
+        radial-gradient(1.5px 1.5px at 60px 260px, rgba(255,255,255,.7), transparent),
+        radial-gradient(1px 1px at 250px 300px, rgba(255,255,255,.5), transparent);
+      background-size: 420px 340px;
+      opacity: .55;
+      animation: drift 240s linear infinite;
+    }
+    .stars::after { content: ""; inset: 0; background-size: 610px 520px; opacity: .6; animation-duration: 360s; }
+    @keyframes drift { to { transform: translate3d(-420px, -340px, 0); } }
+
+    .wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .nav-links { display: flex; gap: 22px; align-items: center; font-size: 15px; color: var(--muted); }
+    .nav-links a { text-decoration: none; transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+
+    /* Hero */
+    .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; padding-top: 64px; padding-bottom: 96px; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+      background: var(--card); border: 1px solid var(--card-border); color: var(--muted); font-size: 13px;
+    }
+    .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    h1 {
+      font-size: clamp(42px, 6vw, 72px); line-height: 1.02; letter-spacing: -0.035em; margin: 22px 0 20px; font-weight: 800;
+    }
+    h1 .accent { color: #c9b8ff; }
+    .lede { font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); max-width: 34em; margin: 0 0 34px; }
+
+    .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 14px;
+      font-weight: 650; font-size: 16px; text-decoration: none; transition: transform .15s ease, box-shadow .2s ease, background .2s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--gradient); color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 8px 20px -8px rgba(0,0,0,.6); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 12px 26px -10px rgba(0,0,0,.7); }
+    .btn-ghost { background: var(--card); border: 1px solid var(--card-border); color: var(--text); }
+    .btn-ghost:hover { background: rgba(255,255,255,.08); }
+    .btn svg { width: 18px; height: 18px; flex: none; }
+    .meta { margin-top: 16px; font-size: 13.5px; color: var(--faint); }
+    .meta b { color: var(--muted); font-weight: 600; }
+
+    /* Product mock */
+    .mock {
+      position: relative; border-radius: 22px; padding: 1px; background: linear-gradient(160deg, rgba(255,255,255,.22), rgba(255,255,255,.03) 40%, rgba(139,108,255,.35));
+      box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .75);
+    }
+    .mock-inner { border-radius: 21px; background: linear-gradient(180deg, #16133a, #0f0d29); overflow: hidden; }
+    .titlebar { display: flex; gap: 8px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .titlebar i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+    .titlebar i:nth-child(2) { background: #febc2e; }
+    .titlebar i:nth-child(3) { background: #28c840; }
+    .mock-body { padding: 20px; display: grid; gap: 14px; }
+    .panel { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 14px; padding: 16px 18px; }
+    .panel-title { font-size: 12.5px; font-weight: 650; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .growth-title { color: #ffa94d; }
+    .addition { display: flex; align-items: center; gap: 14px; }
+    .folder {
+      width: 42px; height: 34px; border-radius: 6px; flex: none; position: relative;
+      background: linear-gradient(180deg, #7cc4ff, #3d8bf2);
+    }
+    .folder::before { content: ""; position: absolute; top: -5px; left: 0; width: 18px; height: 8px; border-radius: 4px 4px 0 0; background: #6bb4fb; }
+    .addition .name { font-weight: 650; font-size: 17px; }
+    .addition .path { font-size: 12.5px; color: var(--faint); }
+    .addition .delta { margin-left: auto; text-align: right; white-space: nowrap; }
+    .addition .delta b { display: block; font-size: 26px; letter-spacing: -0.02em; color: #ffa94d; line-height: 1.1; }
+    .addition .delta span { font-size: 12px; color: var(--faint); }
+    .tag { font-size: 10px; font-weight: 700; color: #ffa94d; background: rgba(255,169,77,.14); border-radius: 999px; padding: 2px 7px; margin-left: 6px; vertical-align: 2px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .bars { display: grid; gap: 10px; }
+    .bar-row { display: grid; gap: 5px; font-size: 12.5px; }
+    .bar-row div:first-child { display: flex; justify-content: space-between; color: var(--muted); }
+    .bar-row div:first-child b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .bar { height: 6px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: inherit; background: var(--gradient); transform-origin: left; animation: grow 1.4s cubic-bezier(.2,.8,.2,1) both; }
+    .bar.green span { background: linear-gradient(90deg, #2bb88a, #4fd1a1); }
+    @keyframes grow { from { transform: scaleX(0); } }
+    .ring { display: grid; place-items: center; }
+    .ring svg { width: 112px; height: 112px; }
+    .ring-label { text-align: center; margin-top: -76px; margin-bottom: 40px; }
+    .ring-label b { display: block; font-size: 22px; line-height: 1; }
+    .ring-label span { font-size: 11px; color: var(--faint); }
+
+    /* Sections */
+    section { padding: 88px 0; }
+    .section-head { max-width: 640px; margin-bottom: 48px; }
+    .kicker { font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--violet); }
+    h2 { font-size: clamp(30px, 3.6vw, 44px); line-height: 1.1; letter-spacing: -0.025em; margin: 10px 0 14px; }
+    .section-head p { color: var(--muted); font-size: 18px; margin: 0; }
+
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feature {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 26px;
+      transition: transform .25s ease, border-color .25s ease, background .25s ease;
+    }
+    .feature:hover { transform: translateY(-3px); border-color: rgba(139,108,255,.4); background: rgba(255,255,255,.06); }
+    .icon {
+      width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 18px;
+      background: rgba(139,108,255,.15); color: #c3b5ff;
+    }
+    .icon svg { width: 22px; height: 22px; }
+    .feature h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.01em; }
+    .feature p { margin: 0; color: var(--muted); font-size: 15px; }
+    code { font: 13.5px/1 ui-monospace, "SF Mono", Menlo, monospace; background: rgba(255,255,255,.07); padding: 3px 6px; border-radius: 6px; color: #d8d0ff; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip { font: 13.5px ui-monospace, "SF Mono", Menlo, monospace; padding: 8px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--card-border); color: var(--muted); }
+    .chip b { color: var(--green); font-weight: 600; margin-left: 6px; }
+
+    /* Install */
+    .install { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: step; }
+    .step { position: relative; padding: 26px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--card-border); }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; margin-bottom: 14px;
+      background: var(--gradient); font-weight: 700; font-size: 14px;
+    }
+    .step h3 { margin: 0 0 6px; font-size: 17px; }
+    .step p { margin: 0; color: var(--muted); font-size: 15px; }
+    .note { margin-top: 18px; color: var(--faint); font-size: 14px; }
+
+    /* Final CTA */
+    .final {
+      text-align: center; border-radius: 28px; padding: 72px 24px; margin: 40px 0 80px; position: relative; overflow: hidden;
+      background: radial-gradient(600px 300px at 50% 0%, rgba(139,108,255,.35), transparent 70%), var(--bg-2);
+      border: 1px solid var(--card-border);
+    }
+    .final img { width: 96px; height: 96px; margin: 0 auto 18px; filter: drop-shadow(0 16px 28px rgba(0,0,0,.55)); }
+    .final h2 { margin-top: 0; }
+    .final p { color: var(--muted); margin: 0 auto 30px; max-width: 30em; }
+    .final .cta { justify-content: center; }
+
+    footer { border-top: 1px solid rgba(255,255,255,.07); padding: 28px 0 40px; color: var(--faint); font-size: 14px; }
+    footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    footer a { text-decoration: none; color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    /* Only hidden once JS runs, so content is always visible without it. */
+    .js .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1); }
+    .js .reveal.in { opacity: 1; transform: none; }
+
+    @media (max-width: 920px) {
+      .hero { grid-template-columns: 1fr; padding-top: 32px; gap: 48px; }
+      .features, .install { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 620px) {
+      .wrap { padding: 0 16px; }
+      .features, .install, .split { grid-template-columns: 1fr; }
+      .nav-links .hide-sm { display: none; }
+      section { padding: 64px 0; }
+      .btn { width: 100%; justify-content: center; }
+      .addition .delta b { font-size: 21px; }
+      .addition .path { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .stars, .stars::after, .bar span { animation: none; }
+      .js .reveal { opacity: 1; transform: none; transition: none; }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true"><div class="stars"></div></div>
+
+  <header class="wrap">
+    <nav>
+      <a class="brand" href="#"><img src="favicon.png" alt="" width="30" height="30">Hubble</a>
+      <div class="nav-links">
+        <a class="hide-sm" href="#features">Features</a>
+        <a class="hide-sm" href="#install">Install</a>
+        <a href="https://github.com/Dodecahedr0x/hubble">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Free &amp; open source · macOS 14+</span>
+        <h1>Hubble, the <span class="accent">disk space telescope</span></h1>
+        <p class="lede">Your disk filled up again? Hubble maps everything on your Mac, shows what grew since the last scan, and finds the build folders and caches you can safely delete.</p>
+        <div class="cta">
+          <a class="btn btn-primary download-link" href="https://github.com/Dodecahedr0x/hubble/releases/latest/download/Hubble.zip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            Download for macOS
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/Dodecahedr0x/hubble">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            View source
+          </a>
+        </div>
+        <p class="meta"><span id="release-info">Latest release</span> · Universal (Apple silicon &amp; Intel)</p>
+      </div>
+
+      <div class="mock" aria-hidden="true">
+        <div class="mock-inner">
+          <div class="titlebar"><i></i><i></i><i></i></div>
+          <div class="mock-body">
+            <div class="panel">
+              <div class="panel-title growth-title">↗ Heaviest addition since last scan</div>
+              <div class="addition">
+                <div class="folder"></div>
+                <div>
+                  <div class="name">target <span class="tag">NEW</span></div>
+                  <div class="path">~/Projects/rollup/target</div>
+                </div>
+                <div class="delta"><b>+12.4 GB</b><span>now 38.1 GB</span></div>
+              </div>
+            </div>
+            <div class="split">
+              <div class="panel">
+                <div class="panel-title" style="color: var(--green)">✦ Cleanup candidates</div>
+                <div class="bars">
+                  <div class="bar-row"><div>Rust build output <b>214 GB</b></div><div class="bar green"><span style="width: 100%"></span></div></div>
+                  <div class="bar-row"><div>Node modules <b>48 GB</b></div><div class="bar green"><span style="width: 32%"></span></div></div>
+                  <div class="bar-row"><div>Xcode DerivedData <b>21 GB</b></div><div class="bar green"><span style="width: 16%"></span></div></div>
+                </div>
+              </div>
+              <div class="panel ring">
+                <svg viewBox="0 0 120 120">
+                  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6c5cff"/><stop offset=".5" stop-color="#b057f2"/><stop offset="1" stop-color="#f2679e"/></linearGradient></defs>
+                  <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="11"/>
+                  <circle cx="60" cy="60" r="48" fill="none" stroke="url(#g)" stroke-width="11" stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="54" transform="rotate(-90 60 60)"/>
+                </svg>
+                <div class="ring-label"><b>82%</b><span>used</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Why Hubble</div>
+          <h2>Know where your space went, before it runs out.</h2>
+          <p>Other disk tools show you a snapshot. Hubble remembers, so it can tell you what changed.</p>
+        </div>
+        <div class="features">
+          <article class="feature reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div>
+            <h3>What grew since last time</h3>
+            <p>Every scan is compared with the previous one, and Hubble points at the exact folder where the growth happened, not just “Library got bigger”.</p>
+          </article>
+          <article class="feature reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 14.6l-5 3.6 1.9-5.8L4 8.8h6.1z"/></svg></div>
+            <h3>Rules made for developers</h3>
+            <p>Built-in rules find <code>target</code> next to <code>Cargo.toml</code>, <code>node_modules</code>, <code>.build</code>, DerivedData and caches. Add your own and trash them in bulk.</p>
+          </article>
+          <article class="feature reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg></div>
+            <h3>Fast, really</h3>
+            <p>A pool of workers reads directories in bulk with <code>getattrlistbulk</code>. Millions of files in about a minute, several times faster than <code>du</code>.</p>
+          </article>
+          <article class="feature reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+            <h3>Alerts that matter</h3>
+            <p>Get notified when free space drops below a threshold, the disk passes a percentage, or a folder grows too much in a day, a week or a month.</p>
+          </article>
+          <article class="feature reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+            <h3>Scans in the background</h3>
+            <p>Automatic low-priority scans run when your Mac is idle, from the menu bar, even with the window closed. You only hear from Hubble when something changed.</p>
+          </article>
+          <article class="feature reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            <h3>Private by design</h3>
+            <p>No account, no analytics, no network calls. Your file list never leaves your Mac, and deletions go to the Trash so nothing is lost by accident.</p>
+          </article>
+        </div>
+        <div class="chips reveal">
+          <span class="chip">target/<b>Cargo.toml</b></span>
+          <span class="chip">node_modules</span>
+          <span class="chip">.build/<b>Package.swift</b></span>
+          <span class="chip">.next/<b>package.json</b></span>
+          <span class="chip">.venv</span>
+          <span class="chip">~/Library/Developer/Xcode/DerivedData</span>
+          <span class="chip">~/.cargo/registry</span>
+          <span class="chip">~/Library/Caches</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Install</div>
+          <h2>Up and running in a minute.</h2>
+        </div>
+        <div class="install">
+          <div class="step reveal">
+            <h3>Download &amp; unzip</h3>
+            <p>Grab <a class="download-link" href="https://github.com/Dodecahedr0x/hubble/releases/latest/download/Hubble.zip">Hubble.zip</a> from the latest release and drag <b>Hubble.app</b> into Applications.</p>
+          </div>
+          <div class="step reveal">
+            <h3>Open it the first time</h3>
+            <p>Hubble isn't notarized yet. If macOS blocks it, open <b>System Settings › Privacy &amp; Security</b> and click <b>Open Anyway</b>.</p>
+          </div>
+          <div class="step reveal">
+            <h3>Scan</h3>
+            <p>Hit <b>Scan</b> (⌘R). For the full picture, grant Full Disk Access when Hubble asks for protected folders.</p>
+          </div>
+        </div>
+        <p class="note reveal">Prefer the terminal? <code>xattr -dr com.apple.quarantine /Applications/Hubble.app</code> clears the download flag. Or build from source with <code>./scripts/build-app.sh</code>.</p>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <div class="final reveal">
+        <img src="icon.png" alt="Hubble app icon" width="96" height="96">
+        <h2>Point the telescope at your disk.</h2>
+        <p>Free, open source, and built for people whose disks fill up faster than they'd like.</p>
+        <div class="cta">
+          <a class="btn btn-primary download-link" href="https://github.com/Dodecahedr0x/hubble/releases/latest/download/Hubble.zip">Download for macOS</a>
+          <a class="btn btn-ghost" href="https://github.com/Dodecahedr0x/hubble/releases">All releases</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Hubble · the disk space telescope</span>
+      <span><a href="https://github.com/Dodecahedr0x/hubble">GitHub</a> · <a href="https://github.com/Dodecahedr0x/hubble/releases">Releases</a> · <a href="https://github.com/Dodecahedr0x/hubble/issues">Report an issue</a></span>
+    </div>
+  </footer>
+
+  <script>
+    // Show the latest version and size. The download links already work without this.
+    fetch("https://api.github.com/repos/Dodecahedr0x/hubble/releases/latest")
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(release => {
+        const asset = (release.assets || []).find(a => a.name === "Hubble.zip");
+        const size = asset ? ` · ${(asset.size / 1048576).toFixed(1)} MB` : "";
+        document.getElementById("release-info").textContent = `Version ${release.tag_name.replace(/^v/, "")}${size}`;
+      })
+      .catch(() => {});
+
+    const io = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+  </script>
+</body>
+</html>
